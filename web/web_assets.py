@@ -44,7 +44,7 @@ function handleThumbError(fileId) {
     }
 }
 
-/* ✅ FIX: रीलोडर अब पूरे एंकर लेआउट को क्रैश किए बिना सीधे इमेज एलिमेंट को रिफ्रेश करेगा */
+/* ✅ FIX: रीलोडर अब पूरे एंकर लेआउट को क्रैश किए बिना सीधे इमेज ELEMENT को रिफ्रेश करेगा */
 async function reloadThumb(fileId) {
     var timestamp = new Date().getTime();
     var img = document.getElementById('img-poster-' + fileId);
@@ -61,7 +61,6 @@ async function triggerCacheFlush() {
     var btn = document.getElementById('flushBtn');
     if (btn) { btn.innerText = "Flushing RAM..."; btn.disabled = true; }
     try {
-        // नोट: बैकएंड पर सीधे कलेक्शंस को डिस्टर्ब करने की जगह फ्रंटएंड से कैशे वार्मअप स्टेट रीसेट कन्फर्मेशन
         alert('🧹 Front-end Layout Buffers and Client Image-cache cleared locally! Server RAM pool is highly protected under MAX_CACHE boundary.');
     } catch(e) {
         alert('Cache reset pipeline complete.');
@@ -82,14 +81,14 @@ async def get_auth(req):
     return None, None
 
 # ─────────────────────────────────────────────────────────
-# 🚀 BUILD PAGE WITH ADMIN ACTOR MANAGER INTEGRATION
+# 🚀 BUILD PAGE WITH ADAPTIVE SIDEBAR ROUTING PIPELINE
 # ─────────────────────────────────────────────────────────
 def build_page(title, body, cls="", active_tab="", role=None):
-    # ✅ फ़िक्स: केवल एडमिन लॉगिन होने पर साइडबार मेनू में "➕ Add New Actor" बटन दिखाई देगा
+    # ✅ व्यवस्थित फिक्स: अब सीधा "🎭 Actors" लिंक सिंक होगा (क्रिएट बटन कैटलॉग के अंदर डाल दिया गया है)
     if role == 'admin': 
-        nav_links = f'<a href="/dashboard" class="sb-link {"active" if active_tab=="dash" else ""}">Home</a><a href="/admin/create_actor" class="sb-link {"active" if active_tab=="actors" else ""}">➕ Add New Actor</a><a href="/stats" class="sb-link {"active" if active_tab=="stats" else ""}">Database Stats</a><a href="/profile" class="sb-link {"active" if active_tab=="profile" else ""}">Profile Settings</a>'
+        nav_links = f'<a href="/dashboard" class="sb-link {"active" if active_tab=="dash" else ""}">Home</a><a href="/actors" class="sb-link {"active" if active_tab=="actors" else ""}">🎭 Actors</a><a href="/stats" class="sb-link {"active" if active_tab=="stats" else ""}">Database Stats</a><a href="/profile" class="sb-link {"active" if active_tab=="profile" else ""}">Profile Settings</a>'
     elif role == 'user': 
-        nav_links = f'<a href="/dashboard" class="sb-link {"active" if active_tab=="dash" else ""}">Home</a><a href="/profile" class="sb-link {"active" if active_tab=="profile" else ""}">Profile Settings</a>'
+        nav_links = f'<a href="/dashboard" class="sb-link {"active" if active_tab=="dash" else ""}">Home</a><a href="/actors" class="sb-link {"active" if active_tab=="actors" else ""}">🎭 Actors</a><a href="/profile" class="sb-link {"active" if active_tab=="profile" else ""}">Profile Settings</a>'
     else: 
         nav_links = ""
 
