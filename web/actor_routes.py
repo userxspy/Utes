@@ -66,7 +66,8 @@ async def actor_profile_display(req):
         if not act: return web.Response(text="Not Found", status=404)
     except: return web.Response(text="Invalid ID", status=400)
     
-    act_name = act.get("name", "") # ✅ फिक्स: नेमएरर (NameError) को जड़ से मिटाया गया
+    act_name = act.get("name", "")
+    safe_bio = html.escape(act.get("bio", "")) # ✅ फिक्स: safe_bio वेरिएबल को डिफाइन कर दिया गया है
     social = act.get("social_links", {})
     gallery_list = act.get("gallery", [])
     t_payload = html.escape(json.dumps(act.get("tags", [])))
@@ -98,8 +99,6 @@ async def actor_profile_display(req):
         @media(min-width:600px) {{ .gallery-grid {{ grid-template-columns:repeat(auto-fill,minmax(180px,1fr)); }} }}
         .gallery-item-wrap {{ position:relative;border-radius:8px;overflow:hidden;border:1px solid var(--border);aspect-ratio:1;cursor:pointer; }}
         .gallery-item {{ width:100%;height:100%;object-fit:cover; }}
-        
-        /* ✅ सीएसएस क्लास फिक्स: डिलीट बटन अब पूरी तरह से दिखाई देगा */
         .gallery-del-btn {{ position:absolute;bottom:8px;left:50%;transform:translateX(-50%);background:rgba(160,8,8,.9);border:1px solid var(--accent);color:#fff;padding:4px 10px;border-radius:4px;font-size:10px;font-weight:700;cursor:pointer;z-index:5; }}
         
         .lightbox {{ position:fixed;inset:0;background:rgba(0,0,0,.92);backdrop-filter:blur(15px);z-index:99999;display:none;align-items:center;justify-content:center;opacity:0;transition:opacity .2s; }}
