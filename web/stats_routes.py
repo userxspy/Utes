@@ -1,6 +1,7 @@
 from aiohttp import web
 from web.web_assets import build_page, get_auth
-from database.ia_filterdb import db_count_documents
+# ✅ FIX: actors कलेक्शन को इम्पोर्ट किया गया ताकि हम प्रोफाइल्स गिन सकें
+from database.ia_filterdb import db_count_documents, actors
 from database.users_chats_db import db as user_db
 
 stats_routes = web.RouteTableDef()
@@ -74,15 +75,21 @@ async def stats(req):
         total_plays = 0
 
     # ─── 📈 LIVE ADAPTIVE COUNTERS PIPELINE ───
-    try: 
-        logged_in_today = await user_db.get_today_logged_in_users_count()
-    except: 
-        logged_in_today = 0
+    try: logged_in_today = await user_db.get_today_logged_in_users_count()
+    except: logged_in_today = 0
 
-    try: 
-        premium_users = await user_db.get_premium_users_count()
-    except: 
-        premium_users = 0
+    try: premium_users = await user_db.get_premium_users_count()
+    except: premium_users = 0
+
+    # ─── 🗂️ UNIVERSAL DIRECTORY COUNTS (NEW) ───
+    try:
+        tot_dir = await actors.count_documents({})
+        app_dir = await actors.count_documents({"category": "app"})
+        web_dir = await actors.count_documents({"category": "website"})
+        # Actor profiles (Total में से App और Website घटा दो, तो बाकी Actor बचेंगे)
+        act_dir = tot_dir - app_dir - web_dir
+    except:
+        tot_dir = app_dir = web_dir = act_dir = 0
 
     p_tot, c_tot, a_tot = s.get('primary', 0), s.get('cloud', 0), s.get('archive', 0)
     grand_total = s.get('total', 1) or 1
@@ -122,6 +129,7 @@ async def stats(req):
     <div class="st-card anim-card"><div class="st-card-bar" style="background:#ff9933;"></div><div class="st-label">Cloud Library — Series</div><div class="st-val" style="color:#ff9933;" data-count="{c_tot}" data-delay="180">{c_tot:,}</div><div class="prog-wrap"><div class="prog-bar" style="width:{c_pct}%;background:linear-gradient(90deg,#ff9933,#ffcc77);animation-delay:.45s;"></div></div><div style="display:flex;justify-content:space-between;align-items:center;"><span class="thumb-badge">🖼️ {s.get('cloud_thumb', 0):,} cached</span><span class="pct-label" style="color:#ff9933;">{c_pct}%</span></div></div>
     <div class="st-card anim-card"><div class="st-card-bar" style="background:#9933ff;"></div><div class="st-label">Backup Warehouse — Archive</div><div class="st-val" style="color:#9933ff;" data-count="{a_tot}" data-delay="240">{a_tot:,}</div><div class="prog-wrap"><div class="prog-bar" style="width:{a_pct}%;background:linear-gradient(90deg,#9933ff,#cc77ff);animation-delay:.5s;"></div></div><div style="display:flex;justify-content:space-between;align-items:center;"><span class="thumb-badge">🖼️ {s.get('archive_thumb', 0):,} cached</span><span class="pct-label" style="color:#9933ff;">{a_pct}%</span></div></div>
   </div>
+  
   <div class="stats-grid-2">
     <div class="st-card anim-card"><div class="st-card-bar" style="background:#e50914;"></div><div class="st-label">Global Image Assets</div><div class="st-val" style="color:#e50914;" data-count="{s.get('total_thumb', 0)}" data-delay="300">{s.get('total_thumb', 0):,}</div><div class="st-sub" style="margin-bottom:12px;">Verified blob identifiers across all DBs</div><button class="flush-btn" id="flushBtn" onclick="triggerCacheFlush()">🧹 Flush RAM Cache</button></div>
     
@@ -138,6 +146,7 @@ async def stats(req):
         </div>
     </div>
   </div>
+  
   <div class="stats-grid-2">
     <div class="st-card anim-card">
         <div class="st-card-bar" style="background:var(--muted);"></div>
@@ -155,7 +164,28 @@ async def stats(req):
             </div>
         </div>
     </div>
-  </div>
+    
+    <div class="st-card anim-card">
+        <div class="st-card-bar" style="background:#e50914;"></div>
+        <div class="st-label">Universal Directory Profiles</div>
+        <div class="st-val" style="color:#e50914;" data-count="{tot_dir}" data-delay="360">{tot_dir:,}</div>
+        <div class="st-sub">Total profiles created across all categories</div>
+        <div class="user-sub-row">
+            <div class="user-sub-cell">
+                <div class="user-sub-cell-lbl">🎭 Actors</div>
+                <div class="user-sub-cell-val" style="color:#3399ff;" data-count="{act_dir}" data-delay="380">{act_dir:,}</div>
+            </div>
+            <div class="user-sub-cell">
+                <div class="user-sub-cell-lbl">📱 Apps</div>
+                <div class="user-sub-cell-val" style="color:#28a745;" data-count="{app_dir}" data-delay="400">{app_dir:,}</div>
+            </div>
+            <div class="user-sub-cell" style="grid-column: span 2; display: flex; justify-content: space-between; align-items: center;">
+                <div class="user-sub-cell-lbl" style="margin:0;">🌐 Websites</div>
+                <div class="user-sub-cell-val" style="color:#9933ff;" data-count="{web_dir}" data-delay="420">{web_dir:,}</div>
+            </div>
+        </div>
+    </div>
+    </div>
   <div class="telemetry-title anim-card">💻 Server Core Telemetry Diagnostics</div>
   <div class="telemetry-grid">
     <div class="t-card anim-card"><div class="t-dot t-dot-pulse" style="background:#28a745;"></div><div><div class="t-lbl">Koyeb Worker Pod</div><div class="t-val" style="color:#28a745;">🟢 Operational</div><div class="t-sub">Port 8000 · 0 errors</div></div></div>
