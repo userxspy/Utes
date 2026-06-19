@@ -31,12 +31,14 @@ primary = db["Primary"]
 cloud   = db["Cloud"]
 archive = db["Archive"]
 actors  = db["Actors"]  # 🎭 एक्टर प्रोफाइल के लिए डेटाबेस कलेक्शन
+reels   = db["Reels"]   # 🎬 नया Reels कलेक्शन
 
 COLLECTIONS = {
     "primary": primary,
     "cloud":   cloud,
     "archive": archive,
-    "actors":  actors,   
+    "actors":  actors,
+    "reels":   reels,   # 🎬 इसे यहाँ जोड़ें
 }
 
 # ⚡ GLOBAL STATUS EXPENSIVE COUNT CACHE
@@ -230,7 +232,7 @@ async def delete_files(query, collection_type="all"):
     deleted = 0
     try:
         if query == "*":
-            cols = [col for name, col in COLLECTIONS.items() if (collection_type == "all" or name == collection_type) and name != "actors"]
+            cols = [col for name, col in COLLECTIONS.items() if (collection_type == "all" or name == collection_type) and name != "actors" and name != "reels"]
             for col in cols:
                 res = await col.delete_many({})
                 deleted += res.deleted_count
@@ -239,7 +241,7 @@ async def delete_files(query, collection_type="all"):
         regex = _build_regex(str(query))
         if not regex: return 0
         flt   = {"file_name": regex}
-        cols  = [col for name, col in COLLECTIONS.items() if (collection_type == "all" or name == collection_type) and name != "actors"]
+        cols  = [col for name, col in COLLECTIONS.items() if (collection_type == "all" or name == collection_type) and name != "actors" and name != "reels"]
         for col in cols:
             res = await col.delete_many(flt)
             deleted += res.deleted_count
@@ -278,7 +280,7 @@ def unpack_new_file_id(new_file_id: str):
         return None
 
 # ─────────────────────────────────────────────────────────
-# 🎭 ACTOR TAGS MULTI-PIPELINE SEARCH ENGINE (100% ISOLATED & DOUBLE CHECKED)
+# 🎭 ACTOR TAGS MULTI-PIPELINE SEARCH ENGINE
 # ─────────────────────────────────────────────────────────
 async def get_actor_search_results(actor_name, tags_list, max_results, offset=0, collection_type="all"):
     """नाम और सभी कस्टमाइज्ड टैग्स को मिलाकर सिंक करता है ताकि वाइल्डकार्ड क्रैश न हो।"""
@@ -325,7 +327,7 @@ async def get_actor_search_results(actor_name, tags_list, max_results, offset=0,
     return results, next_offset
 
 # ─────────────────────────────────────────────────────────
-# 🗑️ ACTOR PROFILE & GALLERY ELEMENT PURGE PIPELINE (NEW UPGRADE)
+# 🗑️ ACTOR PROFILE & GALLERY ELEMENT PURGE PIPELINE
 # ─────────────────────────────────────────────────────────
 async def delete_actor_profile(actor_id):
     """डेटाबेस से एक्टर की पूरी प्रोफाइल डिलीट करता है।"""
@@ -348,4 +350,41 @@ async def delete_gallery_image_by_index(actor_id, index: int):
         return bool(res.modified_count)
     except Exception as e:
         logger.error(f"delete_gallery_image error: {e}")
+        return False
+
+# ─────────────────────────────────────────────────────────
+# 🎬 REELS DATABASE ENGINE (NEW)
+# ─────────────────────────────────────────────────────────
+async def save_reel(media, caption, message_id):
+    try:
+        file_id = unpack_new_file_id(media.file_id)
+        if not file_id: return False
+
+        # चेक करें कि रील पहले से तो नहीं है
+        exists = await reels.find_one({"_id": file_id})
+        if exists: return False
+
+        # हैशटैग्स निकालें (जैसे #funny #comedy)
+        hashtags = [word for word in str(caption).split() if word.startswith("#")]
+        clean_caption = str(caption).strip()
+
+        # अगर थंबनेल है तो सेव करें
+        thumb_id = media.thumbs[0].file_id if media.thumbs and len(media.thumbs) > 0 else None
+
+        reel_data = {
+            "_id": file_id,
+            "message_id": message_id,
+            "file_ref": media.file_id,
+            "caption": clean_caption,
+            "hashtags": hashtags,
+            "duration": getattr(media, 'duration', 0),
+            "thumb_url": f"TG_ID:{thumb_id}" if thumb_id else "NO_THUMB",
+            "added_date": time.time(),
+            "views": 0
+        }
+        
+        await reels.insert_one(reel_data)
+        return True
+    except Exception as e:
+        logger.error(f"Reel Index Error: {e}")
         return False
