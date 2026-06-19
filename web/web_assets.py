@@ -84,11 +84,11 @@ async def get_auth(req):
 # 🚀 BUILD PAGE WITH ADAPTIVE SIDEBAR ROUTING PIPELINE
 # ─────────────────────────────────────────────────────────
 def build_page(title, body, cls="", active_tab="", role=None):
-    # ✅ व्यवस्थित फिक्स: अब सीधा "🎭 Actors" लिंक सिंक होगा (क्रिएट बटन कैटलॉग के अंदर डाल दिया गया है)
+    # ✅ व्यवस्थित फिक्स: अब सीधा "🎬 Reels" लिंक सिंक होगा 
     if role == 'admin': 
-        nav_links = f'<a href="/dashboard" class="sb-link {"active" if active_tab=="dash" else ""}">Home</a><a href="/actors" class="sb-link {"active" if active_tab=="actors" else ""}">🎭 Actors</a><a href="/stats" class="sb-link {"active" if active_tab=="stats" else ""}">Database Stats</a><a href="/profile" class="sb-link {"active" if active_tab=="profile" else ""}">Profile Settings</a>'
+        nav_links = f'<a href="/dashboard" class="sb-link {"active" if active_tab=="dash" else ""}">Home</a><a href="/reels" class="sb-link {"active" if active_tab=="reels" else ""}">🎬 Reels</a><a href="/actors" class="sb-link {"active" if active_tab=="actors" else ""}">🎭 Actors</a><a href="/stats" class="sb-link {"active" if active_tab=="stats" else ""}">Database Stats</a><a href="/profile" class="sb-link {"active" if active_tab=="profile" else ""}">Profile Settings</a>'
     elif role == 'user': 
-        nav_links = f'<a href="/dashboard" class="sb-link {"active" if active_tab=="dash" else ""}">Home</a><a href="/actors" class="sb-link {"active" if active_tab=="actors" else ""}">🎭 Actors</a><a href="/profile" class="sb-link {"active" if active_tab=="profile" else ""}">Profile Settings</a>'
+        nav_links = f'<a href="/dashboard" class="sb-link {"active" if active_tab=="dash" else ""}">Home</a><a href="/reels" class="sb-link {"active" if active_tab=="reels" else ""}">🎬 Reels</a><a href="/actors" class="sb-link {"active" if active_tab=="actors" else ""}">🎭 Actors</a><a href="/profile" class="sb-link {"active" if active_tab=="profile" else ""}">Profile Settings</a>'
     else: 
         nav_links = ""
 
