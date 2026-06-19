@@ -2,9 +2,10 @@ import logging
 import re
 import gc
 from hydrogram import Client, filters
-from info import PRIMARY_CHANNEL, CLOUD_CHANNEL, ARCHIVE_CHANNEL, LOG_CHANNEL
-# नो-रिपिटिशन रूल: सीधे ia_filterdb का कोर save_file फंक्शन उपयोग करेंगे
-from database.ia_filterdb import COLLECTIONS, unpack_new_file_id, save_file, primary
+# 🎬 REELS_CHANNEL इम्पोर्ट किया गया
+from info import PRIMARY_CHANNEL, CLOUD_CHANNEL, ARCHIVE_CHANNEL, LOG_CHANNEL, REELS_CHANNEL
+# 🎬 save_reel इम्पोर्ट किया गया
+from database.ia_filterdb import COLLECTIONS, unpack_new_file_id, save_file, primary, save_reel
 
 logger = logging.getLogger(__name__)
 
@@ -12,6 +13,7 @@ CHANNELS = {}
 for cid in PRIMARY_CHANNEL: CHANNELS[cid] = "primary"
 for cid in CLOUD_CHANNEL: CHANNELS[cid] = "cloud"
 for cid in ARCHIVE_CHANNEL: CHANNELS[cid] = "archive"
+for cid in REELS_CHANNEL: CHANNELS[cid] = "reels" # 🎬 नया Reels चैनल मैप किया गया
 
 # चैनल आईडी की सूची तैयार करें
 INDEX_CHATS = list(CHANNELS.keys())
@@ -32,7 +34,7 @@ def get_file_info(message):
     except: 
         pass
         
-    return media, file_id, file_size, file_name
+    return media, file_id, file_size, file_name, caption_text
 
 if INDEX_CHATS:
     
@@ -44,43 +46,69 @@ if INDEX_CHATS:
         parsed_data = get_file_info(message)
         if not parsed_data: return
             
-        media, file_id, file_size, file_name = parsed_data
+        media, file_id, file_size, file_name, caption_text = parsed_data
         target_col_name = CHANNELS[message.chat.id]
         
-        # मीडिया ऑब्जेक्ट में कैप्शन वेरिएबल सिंक करें ताकि save_file इसे प्रोसेस कर सके
-        media.caption = file_name
-        
-        # ✅ NO REPETITION: अलग से पूरा रिप्लेसमेंट कोड लिखने के बजाय सीधे कोर save_file को कॉल किया
-        sts = await save_file(media, collection_type=target_col_name)
-        
-        try:
-            if sts == "dup":
-                await message.react("♻️")
-                logger.info(f"➡️ Duplicate skipped in {target_col_name.upper()}: {file_name}")
-                return
-            elif sts == "suc":
-                await message.react("✅")
-                logger.info(f"✅ Auto-Indexed into {target_col_name.upper()}: {file_name}")
+        # 🎬 REELS INDEXING LOGIC
+        if target_col_name == "reels":
+            # रील्स के लिए हम नया save_reel फंक्शन इस्तेमाल करेंगे
+            saved = await save_reel(media, caption_text or "", message.id)
+            try:
+                if saved:
+                    await message.react("🔥")
+                    logger.info(f"🎬 Auto-Indexed New Reel: {file_id[-8:]}")
+                    
+                    if LOG_CHANNEL:
+                        size_str = f"{file_size / (1024*1024):.2f} MB"
+                        log_text = (
+                            f"🎬 <b>#Auto_Index_Reel 📱</b>\n\n"
+                            f"🔹 <b>Reel Source:</b> <code>{message.chat.title}</code>\n"
+                            f"🔹 <b>Size:</b> <code>{size_str}</code>\n"
+                            f"📚 <b>Collection:</b> <code>REELS</code>\n\n"
+                            f"✅ <i>Short Video Saved into Database!</i>"
+                        )
+                        await client.send_message(LOG_CHANNEL, log_text)
+                else:
+                    await message.react("♻️") # पहले से मौजूद है
+            except Exception as e:
+                logger.debug(f"Reel Auto-Index Log Error: {e}")
+            finally:
+                gc.collect()
                 
-                # 📢 ✅ FIX: ऑटो-इंडेक्स होते ही LOG_CHANNEL में लाइव लॉग अलर्ट रिपोर्ट भेजें
-                if LOG_CHANNEL:
-                    size_str = f"{file_size / (1024*1024):.2f} MB"
-                    log_text = (
-                        f"📢 <b>#Auto_Index_Alert 🌐</b>\n\n"
-                        f"🔹 <b>File Name:</b> <code>{file_name}</code>\n"
-                        f"🔹 <b>Size:</b> <code>{size_str}</code>\n"
-                        f"🔹 <b>Source Channel:</b> <code>{message.chat.title}</code>\n"
-                        f"📚 <b>Collection Lock:</b> <code>{target_col_name.upper()}</code>\n\n"
-                        f"✅ <i>Saved into Database successfully!</i>"
-                    )
-                    await client.send_message(LOG_CHANNEL, log_text)
-            else:
-                await message.react("❌")
-        except Exception as log_err:
-            logger.debug(f"Auto-Index Reaction/Log Error: {log_err}")
-        finally:
-            # कोएब रैम को आइडल टाइम पर 100% खाली रखने के लिए गारबेज कलेक्शन
-            gc.collect()
+        # 📁 NORMAL MOVIES/SERIES INDEXING LOGIC
+        else:
+            # मीडिया ऑब्जेक्ट में कैप्शन वेरिएबल सिंक करें ताकि save_file इसे प्रोसेस कर सके
+            media.caption = file_name
+            sts = await save_file(media, collection_type=target_col_name)
+            
+            try:
+                if sts == "dup":
+                    await message.react("♻️")
+                    logger.info(f"➡️ Duplicate skipped in {target_col_name.upper()}: {file_name}")
+                    return
+                elif sts == "suc":
+                    await message.react("✅")
+                    logger.info(f"✅ Auto-Indexed into {target_col_name.upper()}: {file_name}")
+                    
+                    # 📢 ✅ FIX: ऑटो-इंडेक्स होते ही LOG_CHANNEL में लाइव लॉग अलर्ट रिपोर्ट भेजें
+                    if LOG_CHANNEL:
+                        size_str = f"{file_size / (1024*1024):.2f} MB"
+                        log_text = (
+                            f"📢 <b>#Auto_Index_Alert 🌐</b>\n\n"
+                            f"🔹 <b>File Name:</b> <code>{file_name}</code>\n"
+                            f"🔹 <b>Size:</b> <code>{size_str}</code>\n"
+                            f"🔹 <b>Source Channel:</b> <code>{message.chat.title}</code>\n"
+                            f"📚 <b>Collection Lock:</b> <code>{target_col_name.upper()}</code>\n\n"
+                            f"✅ <i>Saved into Database successfully!</i>"
+                        )
+                        await client.send_message(LOG_CHANNEL, log_text)
+                else:
+                    await message.react("❌")
+            except Exception as log_err:
+                logger.debug(f"Auto-Index Reaction/Log Error: {log_err}")
+            finally:
+                # कोएब रैम को आइडल टाइम पर 100% खाली रखने के लिए गारबेज कलेक्शन
+                gc.collect()
 
     # ─────────────────────────────────────────────────────────
     # 🔄 LIVE EDITED CAPTION AUTO-UPDATE ROUTE
@@ -90,7 +118,7 @@ if INDEX_CHATS:
         parsed_data = get_file_info(message)
         if not parsed_data: return
             
-        _, file_id, _, file_name = parsed_data
+        _, file_id, _, file_name, _ = parsed_data
         db_id = unpack_new_file_id(file_id)
         if not db_id: return
 
