@@ -67,6 +67,7 @@ GEMINI_API_KEY = environ.get("GEMINI_API_KEY", "")
 PRIMARY_CHANNEL = get_channels("PRIMARY_CHANNEL")
 CLOUD_CHANNEL = get_channels("CLOUD_CHANNEL")
 ARCHIVE_CHANNEL = get_channels("ARCHIVE_CHANNEL")
+REELS_CHANNEL = get_channels("REELS_CHANNEL")  # 🎬 नया Reels चैनल यहाँ जोड़ा गया है!
 
 LOG_CHANNEL = int(environ.get("LOG_CHANNEL", "0"))
 if not LOG_CHANNEL:
