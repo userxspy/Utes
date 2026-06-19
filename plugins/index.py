@@ -6,7 +6,8 @@ import gc
 from hydrogram import Client, filters, enums
 from hydrogram.errors import FloodWait
 from info import ADMINS, LOG_CHANNEL
-from database.ia_filterdb import save_file
+# 🎬 FIX: यहाँ save_reel को इम्पोर्ट किया गया
+from database.ia_filterdb import save_file, save_reel
 from hydrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from utils import temp, get_readable_time
 from Script import script
@@ -30,7 +31,8 @@ async def index_files(bot, query):
                 InlineKeyboardButton('📂 CLOUD', callback_data=f'index#start#{chat}#{lst_msg_id}#{skip}#cloud')
             ],
             [
-                InlineKeyboardButton('📦 ARCHIVES', callback_data=f'index#start#{chat}#{lst_msg_id}#{skip}#archive')
+                InlineKeyboardButton('📦 ARCHIVES', callback_data=f'index#start#{chat}#{lst_msg_id}#{skip}#archive'),
+                InlineKeyboardButton('🎬 REELS', callback_data=f'index#start#{chat}#{lst_msg_id}#{skip}#reels') # 🎬 नया REELS बटन
             ],
             [
                 InlineKeyboardButton('❌ CANCEL', callback_data='close_data')
@@ -41,7 +43,8 @@ async def index_files(bot, query):
             f"⏭️ Skip: <code>{skip}</code>\n\n"
             "• <b>PRIMARY</b> - Main database\n"
             "• <b>CLOUD</b> - Cloud storage\n"
-            "• <b>ARCHIVES</b> - Archive storage",
+            "• <b>ARCHIVES</b> - Archive storage\n"
+            "• <b>REELS</b> - Short Videos",
             reply_markup=InlineKeyboardMarkup(buttons)
         )
         
@@ -64,7 +67,8 @@ async def index_files(bot, query):
                 InlineKeyboardButton('📂 CLOUD', callback_data=f'index#start#{chat}#{lst_msg_id}#{skip}#cloud')
             ],
             [
-                InlineKeyboardButton('📦 ARCHIVES', callback_data=f'index#start#{chat}#{lst_msg_id}#{skip}#archive')
+                InlineKeyboardButton('📦 ARCHIVES', callback_data=f'index#start#{chat}#{lst_msg_id}#{skip}#archive'),
+                InlineKeyboardButton('🎬 REELS', callback_data=f'index#start#{chat}#{lst_msg_id}#{skip}#reels') # 🎬 नया REELS बटन
             ],
             [
                 InlineKeyboardButton('❌ CANCEL', callback_data='close_data')
@@ -75,7 +79,8 @@ async def index_files(bot, query):
             f"⏭️ Skip: <code>{skip}</code>\n\n"
             "• <b>PRIMARY</b> - Main database\n"
             "• <b>CLOUD</b> - Cloud storage\n"
-            "• <b>ARCHIVES</b> - Archive storage",
+            "• <b>ARCHIVES</b> - Archive storage\n"
+            "• <b>REELS</b> - Short Videos",
             reply_markup=InlineKeyboardMarkup(buttons)
         )
     
@@ -194,7 +199,6 @@ async def index_files_to_db(lst_msg_id, chat, msg, bot, skip, collection_type="p
                     )
                     await msg.edit(status_cap)
                     
-                    # ✅ FIX: कैंसिल होने पर भी LOG_CHANNEL में पूरी रिपोर्ट पुश करें
                     if LOG_CHANNEL:
                         try:
                             await bot.send_message(
@@ -206,7 +210,7 @@ async def index_files_to_db(lst_msg_id, chat, msg, bot, skip, collection_type="p
                 
                 current += 1
                 
-                # टेलीग्राम फ्लड प्रिवेंटर — हर 50 मैसेज + न्यूनतम 4 सेकंड का टाइम इंटरवल गैप
+                # टेलीग्राम फ्लड प्रिवेंटर
                 if current % 50 == 0 and (time.time() - last_update_time > 4):
                     last_update_time = time.time()
                     btn = [[
@@ -232,7 +236,6 @@ async def index_files_to_db(lst_msg_id, chat, msg, bot, skip, collection_type="p
                     except Exception:
                         pass
                     
-                    # कोएब रैम कैशे क्लीनअप सिंक
                     gc.collect()
                 
                 if message.empty:
@@ -251,7 +254,8 @@ async def index_files_to_db(lst_msg_id, chat, msg, bot, skip, collection_type="p
                     continue
                 
                 file_size = getattr(media, 'file_size', 0)
-                if file_size < 2097152:  
+                # 🎬 FIX: रील्स छोटी होती हैं, इसलिए उन्हें 2MB (2097152) से कम होने पर भी इग्नोर न करें
+                if collection_type != "reels" and file_size < 2097152:  
                     badfiles += 1
                     continue
                 
@@ -262,7 +266,14 @@ async def index_files_to_db(lst_msg_id, chat, msg, bot, skip, collection_type="p
                 except:
                     pass
                 
-                sts = await save_file(media, collection_type=collection_type)
+                # 🎬 REELS SAVING LOGIC
+                if collection_type == "reels":
+                    caption_text = message.caption if message.caption else ""
+                    saved = await save_reel(media, caption_text, message.id)
+                    sts = 'suc' if saved else 'dup'
+                else:
+                    # 📁 NORMAL MOVIES/SERIES LOGIC
+                    sts = await save_file(media, collection_type=collection_type)
                 
                 if sts == 'suc':
                     total_files += 1
@@ -289,7 +300,6 @@ async def index_files_to_db(lst_msg_id, chat, msg, bot, skip, collection_type="p
                 f'🚫 Bad Files: <code>{badfiles}</code>'
             )
             
-            # 📢 ✅ FIX: इंडेक्सिंग सफलतापूर्वक ख़त्म होते ही LOG_CHANNEL में सुपर रिपोर्ट भेजें
             if LOG_CHANNEL:
                 try:
                     await bot.send_message(
@@ -308,4 +318,4 @@ async def index_files_to_db(lst_msg_id, chat, msg, bot, skip, collection_type="p
                 except Exception as log_err:
                     logger.error(f"Failed to send indexing log to LOG_CHANNEL: {log_err}")
         finally:
-            gc.collect() # अंतिम इन-मेमोरी क्लीनअप पैश ताकि कोएब रैम खाली रहे
+            gc.collect()
